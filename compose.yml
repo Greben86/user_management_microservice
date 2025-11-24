@@ -1,0 +1,98 @@
+version: "3.8"
+services:
+  # gobackendservice:
+  #   container_name: go-backend-service
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     DB_HOST: "postgres"
+  #     DB_PORT: 5432
+  #     DB_NAME: "go_exam_db"
+  #     DB_USER: "admin"
+  #     DB_PASS: "admin"
+  #     SMTP_HOST: "fakesmtp"
+  #     SMTP_PORT: 1025
+  #     SMTP_USER: "admin@mail.me"
+  #     SMTP_PASS: "admin"
+  #   ports:
+  #     - "8080:8080"
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1'
+  #         memory: 1G
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://gobackendservice:8080/health || exit -1" ]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+  #   networks:
+  #     - application-network
+  #   depends_on:
+  #     - postgres
+
+  postgres:
+    image: postgres:17.0-alpine3.20
+    environment:
+      POSTGRES_DB: "database"
+      POSTGRES_USER: "admin"
+      POSTGRES_PASSWORD: "admin"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - /Init Database:/docker-entrypoint-initdb.d
+      - database-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d database" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    networks:
+      - application-network
+
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@mail.me"
+      PGADMIN_DEFAULT_PASSWORD: "admin"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/misc/ping || exit -1" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - application-network
+    depends_on:
+      - postgres
+
+volumes:
+  database-data:
+  pgadmin-data:
+
+networks:
+  application-network:
+    driver: bridge
