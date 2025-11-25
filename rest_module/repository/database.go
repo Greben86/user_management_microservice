@@ -3,8 +3,6 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"io"
-	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -89,23 +87,5 @@ func (manager *DBManager) RollbackTransaction() error {
 
 	manager.currentTransaction.Rollback()
 	manager.currentTransaction = nil
-	return nil
-}
-
-// Миграция БД
-func (manager *DBManager) InitDB() error {
-	file, err := os.Open("repository/init_database.sql")
-	if err != nil {
-		return fmt.Errorf("Файл миграции БД не найден %s", err.Error())
-	}
-
-	body, _ := io.ReadAll(file)
-	_, err = manager.database.Exec(string(body))
-	if err != nil {
-		return fmt.Errorf("Ошибка выполнения скрипта миграции %s", err.Error())
-	}
-
-	log.Println("База данных обновлена!")
-
 	return nil
 }

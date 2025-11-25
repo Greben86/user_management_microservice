@@ -42,7 +42,7 @@ services:
       POSTGRES_PASSWORD: "admin"
       PGDATA: "/var/lib/postgresql/data/pgdata"
     volumes:
-      - /Init Database:/docker-entrypoint-initdb.d
+      - ./Init:/docker-entrypoint-initdb.d
       - database-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"

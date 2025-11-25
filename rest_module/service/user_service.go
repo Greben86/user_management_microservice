@@ -59,6 +59,40 @@ func (manager *UserManager) AddUser(Username, Password, Email string) (*User, er
 	return &user, nil
 }
 
+// Обновление пользователя
+func (manager *UserManager) UpdateUser(id int64, Username, Password, Email string) (*User, error) {
+	log.Println("Обновление пользователя")
+	manager.m.Lock()
+	defer manager.m.Unlock()
+
+	// Проверяем корректность Email
+	err := validEmail(Email)
+	if err != nil {
+		return nil, fmt.Errorf("Не валидный Email %s", err.Error())
+	}
+
+	if len(Password) < 8 {
+		return nil, fmt.Errorf("Пароль должен содержать не менее 8 символов")
+	}
+
+	manager.repository.Db.BeginTransaction()
+	exist, _ := manager.repository.GetUserByName(Username)
+	if exist != nil {
+		manager.repository.Db.RollbackTransaction()
+		return nil, fmt.Errorf("Пользователь с таким логином уже есть")
+	}
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(Password), bcrypt.DefaultCost)
+	user := User{Username: Username, Email: Email, Password: string(hashedPassword)}
+	err = manager.repository.UpdateUser(id, &user, string(hashedPassword))
+	if err != nil {
+		manager.repository.Db.RollbackTransaction()
+		return nil, fmt.Errorf("Ошибка обновления пользователя %s", err.Error())
+	}
+	manager.repository.Db.CommitTransaction()
+	return &user, nil
+}
+
 // Проверка валидности Email
 func validEmail(email string) error {
 	_, err := mail.ParseAddress(email)
@@ -97,4 +131,38 @@ func (manager *UserManager) FindUserByName(Username string) (*User, error) {
 	manager.repository.Db.CommitTransaction()
 
 	return user, nil
+}
+
+// Поиск пользователей
+func (manager *UserManager) FindAllUsers() (*[]User, error) {
+	log.Println("Чтение пользователей")
+	manager.m.Lock()
+	defer manager.m.Unlock()
+
+	manager.repository.Db.BeginTransaction()
+	users, _ := manager.repository.GetAllUsers()
+	if users == nil {
+		manager.repository.Db.RollbackTransaction()
+		return nil, fmt.Errorf("Пользователи не найдены")
+	}
+	manager.repository.Db.CommitTransaction()
+
+	return users, nil
+}
+
+// Удаление пользователя
+func (manager *UserManager) DeleteUserById(id int64) error {
+	log.Println("Удаление пользователя")
+	manager.m.Lock()
+	defer manager.m.Unlock()
+
+	manager.repository.Db.BeginTransaction()
+	err := manager.repository.DeleteUserById(id)
+	if err != nil {
+		manager.repository.Db.RollbackTransaction()
+		return fmt.Errorf("Ошибка удаления пользователя %s", err.Error())
+	}
+	manager.repository.Db.CommitTransaction()
+
+	return nil
 }

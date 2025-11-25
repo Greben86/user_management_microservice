@@ -37,10 +37,10 @@ func (repo *UserRepository) InsertUser(user *User) (int64, error) {
 }
 
 // Обновление пользователя
-func (repo *UserRepository) UpdateUser(user *User) error {
+func (repo *UserRepository) UpdateUser(id int64, user *User, pass string) error {
 	insertStmt := `update "users" set "username"=$1, "password"=$2, "email"=$3 where "id" = $1`
 
-	_, err := repo.Database().Exec(insertStmt, user.Username, user.Password, user.Email, user.ID)
+	_, err := repo.Database().Exec(insertStmt, user.Username, pass, user.Email, id)
 	if err != nil {
 		return err
 	}
@@ -108,4 +108,50 @@ func (repo *UserRepository) GetUserByName(name string) (*User, error) {
 	}
 
 	return nil, nil
+}
+
+// Все пользователи
+func (repo *UserRepository) GetAllUsers() (*[]User, error) {
+	selectStmt := `select "id", "username", "password", "email" from "users"`
+	rows, err := repo.Database().Query(selectStmt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	if rows.Next() {
+		var id int64
+		var username string
+		var password string
+		var email string
+
+		err = rows.Scan(&id, &username, &password, &email)
+		if err != nil {
+			return nil, err
+		}
+
+		user := User{
+			ID:       id,
+			Username: username,
+			Password: password,
+			Email:    email,
+		}
+
+		users = append(users, user)
+	}
+
+	return &users, nil
+}
+
+// Удаление пользователя
+func (repo *UserRepository) DeleteUserById(id int64) error {
+	insertStmt := `delete from "users" where "username" ~ $1`
+
+	err := repo.Database().QueryRow(insertStmt).Scan(&id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
