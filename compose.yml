@@ -1,38 +1,34 @@
 version: "3.8"
 services:
-  # gobackendservice:
-  #   container_name: go-backend-service
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     DB_HOST: "postgres"
-  #     DB_PORT: 5432
-  #     DB_NAME: "go_exam_db"
-  #     DB_USER: "admin"
-  #     DB_PASS: "admin"
-  #     SMTP_HOST: "fakesmtp"
-  #     SMTP_PORT: 1025
-  #     SMTP_USER: "admin@mail.me"
-  #     SMTP_PASS: "admin"
-  #   ports:
-  #     - "8080:8080"
-  #   restart: unless-stopped
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1'
-  #         memory: 1G
-  #   healthcheck:
-  #     test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://gobackendservice:8080/health || exit -1" ]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 10s
-  #   networks:
-  #     - application-network
-  #   depends_on:
-  #     - postgres
+  gobackendservice:
+    container_name: go-backend-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: "postgres"
+      DB_PORT: 5432
+      DB_NAME: "database"
+      DB_USER: "admin"
+      DB_PASS: "admin"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://gobackendservice:8080/health || exit -1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - application-network
+    depends_on:
+      - postgres
 
   postgres:
     image: postgres:17.0-alpine3.20
@@ -88,6 +84,54 @@ services:
       - application-network
     depends_on:
       - postgres
+
+  prometheus:
+    image: prom/prometheus:latest
+    user: root
+    volumes:
+      - './config/prometheus/:/etc/prometheus/'
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    environment:
+      TZ: "Europe/Moscow"
+    networks:
+      - application-network
+    depends_on:
+      - gobackendservice
+
+  grafana:
+    image: grafana/grafana:latest
+    user: root
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./config/grafana/datasources/prometheus_ds.yml:/etc/grafana/provisioning/datasources/prometheus_ds.yml"
+      - "./config/grafana/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml"
+      - "./config/grafana/prometheus:/var/lib/grafana/dashboards/prometheus"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --tries=1 -O- http://grafana:3000/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - application-network
+    depends_on:
+      - gobackendservice
+      - prometheus
 
 volumes:
   database-data:
