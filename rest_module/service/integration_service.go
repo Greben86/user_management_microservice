@@ -21,8 +21,8 @@ type IntegrationService struct {
 
 func NewIntegrationService() *IntegrationService {
 	var endpoint = GetEnv("MINIO_ENDPOINT", "localhost:9000")
-	var accessKey = GetEnv("MINIO_ACCESS_KEY", "admin")
-	var secretKey = GetEnv("MINIO_SECRET_KEY", "admin")
+	var accessKey = GetEnv("MINIO_ACCESS_KEY", "minioadmin")
+	var secretKey = GetEnv("MINIO_SECRET_KEY", "minioadmin")
 	var bucket = GetEnv("MINIO_BUCKET", "users")
 
 	client, err := minio.New(endpoint, &minio.Options{

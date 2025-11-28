@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/mail"
 	"rest_module/repository"
 	"sync"
 	"time"
@@ -35,12 +34,6 @@ func (manager *UserManager) AddUser(Username, Password, Email string) (*User, er
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
-	// Проверяем корректность Email
-	err := validEmail(Email)
-	if err != nil {
-		return nil, fmt.Errorf("Не валидный Email %s", err.Error())
-	}
-
 	if len(Password) < 8 {
 		return nil, fmt.Errorf("Пароль должен содержать не менее 8 символов")
 	}
@@ -54,13 +47,15 @@ func (manager *UserManager) AddUser(Username, Password, Email string) (*User, er
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(Password), bcrypt.DefaultCost)
 	user := User{Username: Username, Email: Email, Password: string(hashedPassword)}
+
+	var err error
 	user.ID, err = manager.repository.InsertUser(&user)
 	if err != nil {
 		manager.repository.Db.RollbackTransaction()
 		return nil, fmt.Errorf("Ошибка добавления пользователя %s", err.Error())
 	}
-	manager.exportUserSnapshot(&user)
 	manager.repository.Db.CommitTransaction()
+	manager.exportUserSnapshot(&user)
 	return &user, nil
 }
 
@@ -70,12 +65,6 @@ func (manager *UserManager) UpdateUser(id int64, Username, Password, Email strin
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
-	// Проверяем корректность Email
-	err := validEmail(Email)
-	if err != nil {
-		return nil, fmt.Errorf("Не валидный Email %s", err.Error())
-	}
-
 	if len(Password) < 8 {
 		return nil, fmt.Errorf("Пароль должен содержать не менее 8 символов")
 	}
@@ -89,20 +78,16 @@ func (manager *UserManager) UpdateUser(id int64, Username, Password, Email strin
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(Password), bcrypt.DefaultCost)
 	user := User{Username: Username, Email: Email, Password: string(hashedPassword)}
+
+	var err error
 	err = manager.repository.UpdateUser(id, &user, string(hashedPassword))
 	if err != nil {
 		manager.repository.Db.RollbackTransaction()
 		return nil, fmt.Errorf("Ошибка обновления пользователя %s", err.Error())
 	}
-	manager.exportUserSnapshot(&user)
 	manager.repository.Db.CommitTransaction()
+	manager.exportUserSnapshot(&user)
 	return &user, nil
-}
-
-// Проверка валидности Email
-func validEmail(email string) error {
-	_, err := mail.ParseAddress(email)
-	return err
 }
 
 // Поиск пользователя по идентификатору

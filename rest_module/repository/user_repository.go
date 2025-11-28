@@ -120,7 +120,7 @@ func (repo *UserRepository) GetAllUsers() (*[]User, error) {
 	defer rows.Close()
 
 	var users []User
-	if rows.Next() {
+	for rows.Next() {
 		var id int64
 		var username string
 		var password string
