@@ -3,23 +3,13 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"os"
+	. "rest_module/utils"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
-	// "strconv"
-
 	_ "github.com/lib/pq"
 )
-
-// const (
-// 	host     = "localhost"
-// 	port     = 5432
-// 	dbname   = "database"
-// 	user     = "admin"
-// 	password = "admin"
-// )
 
 type DBManager struct {
 	database           *sql.DB
@@ -29,14 +19,14 @@ type DBManager struct {
 // Конструктор БД.
 func NewDBManager() *DBManager {
 	// Получение параметров из переменных окружения
-	host := os.Getenv("DB_HOST")
-	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
+	host := GetEnv("DB_HOST", "localhost")
+	port, err := strconv.Atoi(GetEnv("DB_PORT", "5432"))
 	if err != nil {
 		panic(err)
 	}
-	dbname := os.Getenv("DB_NAME")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASS")
+	dbname := GetEnv("DB_NAME", "database")
+	user := GetEnv("DB_USER", "admin")
+	password := GetEnv("DB_PASS", "admin")
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)

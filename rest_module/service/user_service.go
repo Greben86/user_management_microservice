@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net/mail"
 	"rest_module/repository"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,20 +16,22 @@ import (
 )
 
 type UserManager struct {
-	m          sync.Mutex                 // мьютекс для синхронизации доступа
-	repository *repository.UserRepository // репозиторий пользователей
+	m           sync.Mutex                 // мьютекс для синхронизации доступа
+	repository  *repository.UserRepository // репозиторий пользователей
+	integration *IntegrationService
 }
 
 // Конструктор сервиса
-func UserManagerNewInstance(repository *repository.UserRepository) *UserManager {
+func UserManagerNewInstance(repository *repository.UserRepository, integration *IntegrationService) *UserManager {
 	manager := UserManager{}
 	manager.repository = repository
+	manager.integration = integration
 	return &manager
 }
 
 // Создание пользователя
 func (manager *UserManager) AddUser(Username, Password, Email string) (*User, error) {
-	log.Println("Создание пользователя")
+	go log.Println("Создание пользователя")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -55,13 +59,14 @@ func (manager *UserManager) AddUser(Username, Password, Email string) (*User, er
 		manager.repository.Db.RollbackTransaction()
 		return nil, fmt.Errorf("Ошибка добавления пользователя %s", err.Error())
 	}
+	manager.exportUserSnapshot(&user)
 	manager.repository.Db.CommitTransaction()
 	return &user, nil
 }
 
 // Обновление пользователя
 func (manager *UserManager) UpdateUser(id int64, Username, Password, Email string) (*User, error) {
-	log.Println("Обновление пользователя")
+	go log.Println("Обновление пользователя")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -89,6 +94,7 @@ func (manager *UserManager) UpdateUser(id int64, Username, Password, Email strin
 		manager.repository.Db.RollbackTransaction()
 		return nil, fmt.Errorf("Ошибка обновления пользователя %s", err.Error())
 	}
+	manager.exportUserSnapshot(&user)
 	manager.repository.Db.CommitTransaction()
 	return &user, nil
 }
@@ -101,7 +107,7 @@ func validEmail(email string) error {
 
 // Поиск пользователя по идентификатору
 func (manager *UserManager) FindUserById(id int64) (*User, error) {
-	log.Println("Поиск пользователя по идентификатору")
+	go log.Println("Поиск пользователя по идентификатору")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -118,7 +124,7 @@ func (manager *UserManager) FindUserById(id int64) (*User, error) {
 
 // Поиск пользователя по имени
 func (manager *UserManager) FindUserByName(Username string) (*User, error) {
-	log.Println("Поиск пользователя по имени")
+	go log.Println("Поиск пользователя по имени")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -135,7 +141,7 @@ func (manager *UserManager) FindUserByName(Username string) (*User, error) {
 
 // Поиск пользователей
 func (manager *UserManager) FindAllUsers() (*[]User, error) {
-	log.Println("Чтение пользователей")
+	go log.Println("Чтение пользователей")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -152,7 +158,7 @@ func (manager *UserManager) FindAllUsers() (*[]User, error) {
 
 // Удаление пользователя
 func (manager *UserManager) DeleteUserById(id int64) error {
-	log.Println("Удаление пользователя")
+	go log.Println("Удаление пользователя")
 	manager.m.Lock()
 	defer manager.m.Unlock()
 
@@ -165,4 +171,18 @@ func (manager *UserManager) DeleteUserById(id int64) error {
 	manager.repository.Db.CommitTransaction()
 
 	return nil
+}
+
+func (manager *UserManager) exportUserSnapshot(user *User) {
+	if manager.integration == nil || user == nil {
+		return
+	}
+	userCopy := *user
+	go func(u User) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := manager.integration.ExportUserSnapshot(ctx, manager.integration.GetBucket(), &u); err != nil {
+			go log.Println("ExportUserSnapshot", err)
+		}
+	}(userCopy)
 }
